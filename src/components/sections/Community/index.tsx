@@ -7,17 +7,6 @@ import { SectionLabel } from "@/components/ui/SectionLabel";
 import { useLang } from "@/lib/LanguageContext";
 import { translations } from "@/lib/translations";
 
-const members = [
-  { role: "Founder, Series A",   location: "San Francisco", initials: "AK" },
-  { role: "Creative Director",   location: "London",        initials: "ML" },
-  { role: "AI Researcher",       location: "Tokyo",         initials: "RN" },
-  { role: "Angel Investor",      location: "Dubai",         initials: "SC" },
-  { role: "Growth Operator",     location: "Berlin",        initials: "JP" },
-  { role: "Startup Studio",      location: "São Paulo",     initials: "EB" },
-  { role: "Product Builder",     location: "Singapore",     initials: "TK" },
-  { role: "YC Alum",             location: "New York",      initials: "AL" },
-];
-
 export function CommunitySection() {
   const ref      = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-10%" });
@@ -71,50 +60,31 @@ export function CommunitySection() {
             >
               {t.sub}
             </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.5 }}
-              className="mt-10 flex items-center gap-4"
-            >
-              <div className="flex -space-x-3">
-                {["RN", "AK", "SC", "ML", "JP"].map((initials, i) => (
-                  <div
-                    key={i}
-                    className="h-10 w-10 rounded-full border border-void bg-graphite flex items-center justify-center text-[0.6rem] font-mono text-silver tracking-wider"
-                  >
-                    {initials}
-                  </div>
-                ))}
-              </div>
-              <div>
-                <p className="text-sm text-ivory font-mono">{t.count}</p>
-                <p className="text-[0.7rem] text-mist font-mono">{t.countSub}</p>
-              </div>
-            </motion.div>
           </div>
 
-          {/* Member cards */}
-          <div className="grid grid-cols-2 gap-3">
-            {members.map((member, i) => (
+          {/* Right — pillars */}
+          <div className="flex flex-col divide-y divide-white/[0.06]">
+            {t.pillars.map((pillar, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 20, scale: 0.97 }}
-                animate={isInView ? { opacity: 1, y: 0, scale: 1 } : {}}
-                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 + i * 0.06 }}
-                className="group glass rounded-sm p-4 hover:bg-white/[0.04] transition-colors duration-500 cursor-default"
+                initial={{ opacity: 0, x: 20 }}
+                animate={isInView ? { opacity: 1, x: 0 } : {}}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.15 + i * 0.15 }}
+                className="group flex items-start gap-6 py-8 hover:border-white/[0.15] transition-colors duration-500"
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-8 w-8 rounded-full bg-graphite border border-white/10 flex items-center justify-center text-[0.55rem] font-mono text-silver tracking-wider shrink-0">
-                    {member.initials}
-                  </div>
-                  <p className="text-[0.7rem] font-mono text-mist truncate">{member.location}</p>
+                <span className="font-mono text-[0.6rem] text-ghost mt-1 shrink-0 tabular-nums">
+                  0{i + 1}
+                </span>
+                <div>
+                  <h3 className="font-display italic text-xl text-ivory mb-2 group-hover:text-chrome transition-colors duration-500">
+                    {pillar.title}
+                  </h3>
+                  <p className="text-body-sm text-mist leading-relaxed">{pillar.desc}</p>
                 </div>
-                <p className="text-[0.75rem] text-ivory/80 font-sans leading-snug">{member.role}</p>
               </motion.div>
             ))}
           </div>
+
         </div>
       </Container>
     </section>

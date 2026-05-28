@@ -56,24 +56,41 @@ export function AboutSection() {
             </motion.p>
           </div>
 
-          {/* Right — stats */}
-          <div className="grid grid-cols-2 gap-px bg-white/[0.06] border border-white/[0.06]">
-            {t.stats.map((stat, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={isInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.3 + i * 0.1 }}
-                className="group flex flex-col justify-end gap-2 p-8 md:p-10 bg-void hover:bg-graphite/40 transition-colors duration-500"
-              >
-                <span className="font-display italic text-[2.5rem] md:text-[3.5rem] leading-none text-gradient-silver">
-                  {stat.value}
-                </span>
-                <span className="font-mono text-label uppercase tracking-widest text-ghost group-hover:text-mist transition-colors duration-300">
-                  {stat.label}
-                </span>
-              </motion.div>
-            ))}
+          {/* Right — manifesto */}
+          <div className="flex flex-col justify-center gap-10 pt-4 lg:pl-8">
+            <motion.span
+              initial={{ opacity: 0, y: 10 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+              className="label-tag self-start"
+            >
+              {t.tagline}
+            </motion.span>
+
+            <motion.p
+              initial={{ opacity: 0, y: 30 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.45 }}
+              className="font-display italic text-[1.9rem] md:text-[2.4rem] text-ivory leading-[1.1]"
+            >
+              {t.manifesto}
+            </motion.p>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.6 }}
+              className="text-body-lg text-mist leading-relaxed max-w-sm"
+            >
+              {t.manifestoSub}
+            </motion.p>
+
+            <motion.div
+              initial={{ scaleX: 0 }}
+              animate={isInView ? { scaleX: 1 } : {}}
+              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.7 }}
+              className="h-px w-full bg-gradient-to-r from-white/20 to-transparent origin-left"
+            />
           </div>
         </div>
 

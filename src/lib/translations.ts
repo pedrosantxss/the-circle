@@ -31,13 +31,10 @@ export const translations = {
       h1:    "Not a community.",
       h2:    "A constellation.",
       p1:    "The Circle exists at the intersection of ambition and execution. We unite the builders, the disruptors, the visionaries who refuse to wait for permission to change the world.",
-      p2:    "This is not a networking group. This is infrastructure for the ambitious — access, capital, knowledge, and a circle of people who raise every standard you thought you had.",
-      stats: [
-        { value: "2,400+", label: "Members worldwide"     },
-        { value: "38",     label: "Countries"              },
-        { value: "$180M+", label: "Raised collectively"   },
-        { value: "∞",      label: "Potential unlocked"    },
-      ],
+      p2:    "This is not a networking group. This is infrastructure for the ambitious — access, knowledge, and a circle of people who raise every standard you thought you had.",
+      tagline:      "Networking · Innovation · Execution",
+      manifesto:    "Building the next generation of young founders.",
+      manifestoSub: "A community for ambitious young people building the future.",
     },
 
     // ─── Ecosystem ─────────────────────────────────────────
@@ -73,13 +70,16 @@ export const translations = {
     // ─── Community ─────────────────────────────────────────
     community: {
       label:    "The Community",
-      h1:       "A global",
-      h2:       "movement of",
-      h3:       "rare minds.",
-      sub:      "From Lagos to London, Bogotá to Bangkok — Circle members are already reshaping industries, building companies, and writing the next chapter of human potential.",
-      count:    "2,400+ members",
-      countSub: "and growing",
+      h1:       "For the next",
+      h2:       "generation of",
+      h3:       "young founders.",
+      sub:      "The Circle is a home for ambitious young builders — people who take ideas seriously and turn them into reality.",
       marquee:  ["Entrepreneurs", "Creators", "Founders", "Builders", "Investors", "Visionaries", "Operators", "Disruptors", "Leaders", "Innovators"],
+      pillars: [
+        { title: "Networking", desc: "Real connections between ambitious young people building in the same direction." },
+        { title: "Innovation", desc: "A space where new ideas are taken seriously and given the fuel they deserve."    },
+        { title: "Execution",  desc: "From concept to reality. The Circle exists to make things happen."              },
+      ],
     },
 
     // ─── CTA ───────────────────────────────────────────────
@@ -96,7 +96,7 @@ export const translations = {
 
     // ─── Footer ────────────────────────────────────────────
     footer: {
-      copyright: "© 2025 The Circle",
+      copyright: "© 2026 The Circle",
       rights:    "All rights reserved",
     },
   },
@@ -129,13 +129,10 @@ export const translations = {
       h1:    "Não é uma comunidade.",
       h2:    "É uma constelação.",
       p1:    "O Círculo existe na intersecção entre ambição e execução. Reunimos os construtores, os disruptores, os visionários que se recusam a esperar permissão para mudar o mundo.",
-      p2:    "Isto não é um grupo de networking. É infraestrutura para os ambiciosos — acesso, capital, conhecimento e um círculo de pessoas que elevam todos os padrões que pensavas ter.",
-      stats: [
-        { value: "2.400+", label: "Membros globais"          },
-        { value: "38",     label: "Países"                   },
-        { value: "$180M+", label: "Captados coletivamente"   },
-        { value: "∞",      label: "Potencial desbloqueado"   },
-      ],
+      p2:    "Isto não é um grupo de networking. É infraestrutura para os ambiciosos — acesso, conhecimento e um círculo de pessoas que elevam todos os padrões que pensavas ter.",
+      tagline:      "Networking · Inovação · Execução",
+      manifesto:    "Construindo a próxima geração de jovens founders.",
+      manifestoSub: "Uma comunidade para jovens ambiciosos construindo o futuro.",
     },
 
     ecosystem: {
@@ -168,13 +165,16 @@ export const translations = {
 
     community: {
       label:    "A Comunidade",
-      h1:       "Um movimento",
-      h2:       "global de",
-      h3:       "mentes raras.",
-      sub:      "De Lagos a Londres, de Bogotá a Banguecoque — os membros do Círculo já estão a remodelar indústrias, a construir empresas e a escrever o próximo capítulo do potencial humano.",
-      count:    "2.400+ membros",
-      countSub: "e a crescer",
+      h1:       "Para a próxima",
+      h2:       "geração de",
+      h3:       "jovens founders.",
+      sub:      "O Círculo é um lar para jovens construtores ambiciosos — pessoas que levam ideias a sério e as transformam em realidade.",
       marquee:  ["Empreendedores", "Criadores", "Fundadores", "Construtores", "Investidores", "Visionários", "Operadores", "Disruptores", "Líderes", "Inovadores"],
+      pillars: [
+        { title: "Networking", desc: "Conexões reais entre jovens ambiciosos que constroem na mesma direção."              },
+        { title: "Inovação",   desc: "Um espaço onde novas ideias são levadas a sério e recebem o combustível que merecem." },
+        { title: "Execução",   desc: "Do conceito à realidade. O Círculo existe para fazer acontecer."                     },
+      ],
     },
 
     cta: {
@@ -189,7 +189,7 @@ export const translations = {
     },
 
     footer: {
-      copyright: "© 2025 The Circle",
+      copyright: "© 2026 The Circle",
       rights:    "Todos os direitos reservados",
     },
   },
