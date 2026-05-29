@@ -4,14 +4,22 @@ import { sendConfirmationEmail, sendAdminNotification } from "@/lib/email";
 import { z } from "zod";
 
 const schema = z.object({
-  fullName:  z.string().min(2).max(100),
-  age:       z.number().int().min(16).max(35),
-  city:      z.string().min(2).max(100),
-  email:     z.string().email(),
-  whatsapp:  z.string().min(8).max(30),
-  instagram: z.string().min(1).max(60),
-  goals:     z.string().min(20).max(2000),
-  project:   z.string().max(200).optional(),
+  fullName:            z.string().min(2).max(100),
+  age:                 z.number().int().min(14).max(40),
+  city:                z.string().min(2).max(100),
+  email:               z.string().email(),
+  whatsapp:            z.string().min(8).max(30),
+  instagram:           z.string().min(1).max(60),
+  focus:               z.string().min(5).max(2000),
+  whyJoin:             z.string().min(5).max(2000),
+  goal12months:        z.string().min(5).max(2000),
+  hasProject:          z.boolean(),
+  projectDescription:  z.string().max(2000).optional(),
+  desiredConnections:  z.string().min(5).max(2000),
+  contribution:        z.string().min(5).max(2000),
+  whySelected:         z.string().min(5).max(2000),
+  activeParticipation: z.boolean(),
+  dreamConversation:   z.string().min(5).max(2000),
 });
 
 export async function POST(req: NextRequest) {
@@ -21,7 +29,6 @@ export async function POST(req: NextRequest) {
 
     const application = await prisma.application.create({ data });
 
-    // Fire-and-forget — don't block response on email
     void sendConfirmationEmail(application);
     void sendAdminNotification(application);
 
@@ -30,7 +37,6 @@ export async function POST(req: NextRequest) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    // Prisma unique constraint violation (duplicate email)
     if ((err as { code?: string })?.code === "P2002") {
       return NextResponse.json({ error: "Email already submitted" }, { status: 409 });
     }
