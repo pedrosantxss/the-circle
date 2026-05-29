@@ -25,6 +25,7 @@ model Application {
   whySelected          String
   activeParticipation  Boolean
   dreamConversation    String
+  adminNotes           String?
   status               Status   @default(NEW)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

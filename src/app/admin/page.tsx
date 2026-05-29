@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 type Status = "NEW" | "UNDER_REVIEW" | "APPROVED" | "REJECTED";
 
 interface Application {
@@ -12,17 +14,27 @@ interface Application {
   email: string;
   whatsapp: string;
   instagram: string;
-  goals: string;
-  project?: string | null;
+  focus: string;
+  whyJoin: string;
+  goal12months: string;
+  hasProject: boolean;
+  projectDescription?: string | null;
+  desiredConnections: string;
+  contribution: string;
+  whySelected: string;
+  activeParticipation: boolean;
+  dreamConversation: string;
+  adminNotes?: string | null;
   status: Status;
   createdAt: string;
 }
 
+// ─── Config ───────────────────────────────────────────────────────────────────
 const STATUS_LABELS: Record<Status, string> = {
-  NEW:          "New",
-  UNDER_REVIEW: "Under Review",
-  APPROVED:     "Approved",
-  REJECTED:     "Rejected",
+  NEW:          "Pendente",
+  UNDER_REVIEW: "Em análise",
+  APPROVED:     "Aprovado",
+  REJECTED:     "Rejeitado",
 };
 
 const STATUS_COLORS: Record<Status, string> = {
@@ -32,190 +44,291 @@ const STATUS_COLORS: Record<Status, string> = {
   REJECTED:     "text-red-400    border-red-400/30    bg-red-400/10",
 };
 
+const QUESTIONS: { key: keyof Application; label: string }[] = [
+  { key: "focus",              label: "No que está focado agora?"              },
+  { key: "whyJoin",            label: "Por que quer entrar?"                   },
+  { key: "goal12months",       label: "Objetivo nos próximos 12 meses"         },
+  { key: "desiredConnections", label: "Pessoas que deseja conhecer"            },
+  { key: "contribution",       label: "O que pode agregar"                     },
+  { key: "whySelected",        label: "Por que deveria ser selecionado?"       },
+  { key: "dreamConversation",  label: "Conversa de 1h — com quem e por quê?"  },
+];
+
+const MONO = { fontFamily: "ui-monospace,monospace" };
+
+// ─── Notes sub-component ──────────────────────────────────────────────────────
+function NotesEditor({ app, onSave }: { app: Application; onSave: () => void }) {
+  const [notes, setNotes]   = useState(app.adminNotes ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved]   = useState(false);
+
+  async function saveNotes() {
+    setSaving(true);
+    await fetch(`/api/admin/applications/${app.id}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ adminNotes: notes }),
+    });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    onSave();
+  }
+
+  return (
+    <div>
+      <p style={MONO} className="text-[9px] uppercase tracking-[0.2em] text-[#444] mb-2">
+        Notas do admin
+      </p>
+      <textarea
+        rows={3}
+        value={notes}
+        onChange={(e) => { setNotes(e.target.value); setSaved(false); }}
+        placeholder="Adicionar nota privada sobre este candidato..."
+        style={MONO}
+        className="w-full bg-white/[0.02] border border-white/[0.06] px-4 py-3 text-[12px] text-[#bbb] placeholder-[#333] focus:outline-none focus:border-white/15 transition-colors resize-none"
+      />
+      <button
+        onClick={saveNotes}
+        disabled={saving}
+        style={MONO}
+        className="mt-2 px-4 py-1.5 text-[9px] uppercase tracking-[0.2em] border border-white/[0.08] text-[#555] hover:border-white/20 hover:text-[#aaa] transition-all disabled:opacity-30"
+      >
+        {saving ? "..." : saved ? "✓ Salvo" : "Salvar nota"}
+      </button>
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function AdminPage() {
+  const router = useRouter();
+
   const [applications, setApplications] = useState<Application[]>([]);
   const [search, setSearch]     = useState("");
   const [filter, setFilter]     = useState<Status | "">("");
   const [loading, setLoading]   = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const searchTimeout           = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const fetchApplications = useCallback(async () => {
+  const fetchApplications = useCallback(async (s: string, f: string) => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (filter) params.set("status", filter);
-    const res = await fetch(`/api/admin/applications?${params.toString()}`);
+    if (s) params.set("search", s);
+    if (f) params.set("status", f);
+    const res  = await fetch(`/api/admin/applications?${params.toString()}`);
     const data = await res.json();
     setApplications(Array.isArray(data) ? data : []);
     setLoading(false);
-  }, [search, filter]);
+  }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(fetchApplications, 300);
-    return () => clearTimeout(timeout);
-  }, [fetchApplications]);
+    clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => fetchApplications(search, filter), 300);
+    return () => clearTimeout(searchTimeout.current);
+  }, [search, filter, fetchApplications]);
 
   async function updateStatus(id: string, status: Status) {
     setUpdating(id);
     await fetch(`/api/admin/applications/${id}`, {
-      method: "PATCH",
+      method:  "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body:    JSON.stringify({ status }),
     });
     setUpdating(null);
-    await fetchApplications();
+    fetchApplications(search, filter);
   }
 
-  const statusCounts = (Object.keys(STATUS_LABELS) as Status[]).map((s) => ({
-    status: s,
-    count: applications.filter((a) => a.status === s).length,
+  async function logout() {
+    await fetch("/api/admin/logout", { method: "POST" });
+    router.push("/admin/login");
+  }
+
+  const counts = (Object.keys(STATUS_LABELS) as Status[]).map((s) => ({
+    s, n: applications.filter((a) => a.status === s).length,
   }));
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#e8e8e4]" style={{ fontFamily: "ui-monospace, monospace" }}>
-      <div className="max-w-7xl mx-auto px-6 py-12">
+    <div className="min-h-screen bg-[#050505] text-[#e8e8e4]" style={MONO}>
+      <div className="max-w-7xl mx-auto px-6 py-10">
 
-        {/* Header */}
-        <div className="flex items-start justify-between mb-10 pb-6 border-b border-white/[0.07]">
+        {/* ── Header ── */}
+        <div className="flex items-start justify-between mb-10 pb-6 border-b border-white/[0.06]">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.3em] text-[#444] mb-3">The Circle</p>
+            <p className="text-[9px] uppercase tracking-[0.3em] text-[#333] mb-2">The Circle</p>
             <h1 className="text-2xl text-[#e8e8e4]" style={{ fontStyle: "italic", fontWeight: 400 }}>
-              Admin Dashboard
+              Painel Administrativo
             </h1>
           </div>
-          <div className="flex gap-4 items-center">
-            {statusCounts.map(({ status, count }) => (
-              <div key={status} className="text-center">
-                <p className={`text-lg font-light ${STATUS_COLORS[status].split(" ")[0]}`}>{count}</p>
-                <p className="text-[9px] uppercase tracking-wider text-[#444]">{STATUS_LABELS[status]}</p>
+
+          <div className="flex items-center gap-8">
+            {counts.map(({ s, n }) => (
+              <div key={s} className="text-center">
+                <p className={`text-xl font-light ${STATUS_COLORS[s].split(" ")[0]}`}>{n}</p>
+                <p className="text-[8px] uppercase tracking-wider text-[#333] mt-0.5">
+                  {STATUS_LABELS[s]}
+                </p>
               </div>
             ))}
+            <button
+              onClick={logout}
+              className="text-[9px] uppercase tracking-[0.2em] text-[#333] hover:text-[#888] transition-colors border border-white/[0.05] px-4 py-2 hover:border-white/10"
+            >
+              Sair
+            </button>
           </div>
         </div>
 
-        {/* Controls */}
+        {/* ── Filters ── */}
         <div className="flex flex-col sm:flex-row gap-3 mb-8">
           <input
             type="text"
-            placeholder="Search by name, email, city, instagram..."
+            placeholder="Buscar por nome, e-mail, cidade, instagram..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 bg-white/[0.03] border border-white/[0.08] px-4 py-3 text-[13px] text-[#e8e8e4] placeholder-[#444] focus:outline-none focus:border-white/20 transition-colors"
+            className="flex-1 bg-white/[0.02] border border-white/[0.07] px-4 py-3 text-[12px] text-[#e8e8e4] placeholder-[#333] focus:outline-none focus:border-white/15 transition-colors"
           />
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as Status | "")}
-            className="bg-white/[0.03] border border-white/[0.08] px-4 py-3 text-[13px] text-[#e8e8e4] focus:outline-none focus:border-white/20 transition-colors cursor-pointer"
+            className="bg-white/[0.02] border border-white/[0.07] px-4 py-3 text-[12px] text-[#e8e8e4] focus:outline-none focus:border-white/15 transition-colors cursor-pointer"
           >
-            <option value="" style={{ background: "#050505" }}>All statuses</option>
-            {(Object.entries(STATUS_LABELS) as [Status, string][]).map(([val, label]) => (
-              <option key={val} value={val} style={{ background: "#050505" }}>{label}</option>
+            <option value="" style={{ background: "#050505" }}>Todos os status</option>
+            {(Object.entries(STATUS_LABELS) as [Status, string][]).map(([v, l]) => (
+              <option key={v} value={v} style={{ background: "#050505" }}>{l}</option>
             ))}
           </select>
         </div>
 
-        {/* Table */}
+        {/* ── Table ── */}
         {loading ? (
-          <div className="py-24 text-center text-[#444] text-sm tracking-widest uppercase">Loading...</div>
+          <div className="py-24 text-center text-[#2a2a2a] text-[11px] uppercase tracking-widest">
+            Carregando...
+          </div>
         ) : applications.length === 0 ? (
-          <div className="py-24 text-center text-[#333] text-sm tracking-widest uppercase">No applications found.</div>
+          <div className="py-24 text-center text-[#2a2a2a] text-[11px] uppercase tracking-widest">
+            Nenhuma candidatura encontrada.
+          </div>
         ) : (
-          <div>
+          <>
             {/* Column headers */}
-            <div className="hidden md:grid gap-4 px-4 py-3 text-[9px] uppercase tracking-[0.25em] text-[#444] border-b border-white/[0.06]"
-              style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto" }}>
-              <span>Applicant</span>
-              <span>Age · City</span>
+            <div
+              className="hidden md:grid gap-4 px-4 py-3 text-[8px] uppercase tracking-[0.25em] text-[#333] border-b border-white/[0.05]"
+              style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto" }}
+            >
+              <span>Candidato</span>
+              <span>Idade · Cidade</span>
               <span>Instagram</span>
-              <span>Date</span>
+              <span>Data</span>
               <span>Status</span>
               <span />
             </div>
 
-            <div className="divide-y divide-white/[0.04]">
+            <div className="divide-y divide-white/[0.03]">
               {applications.map((app) => (
                 <div key={app.id}>
-                  {/* Row */}
+
+                  {/* ── Row ── */}
                   <div
-                    className="grid gap-4 px-4 py-4 cursor-pointer hover:bg-white/[0.015] transition-colors duration-300"
+                    className="grid gap-4 px-4 py-4 cursor-pointer hover:bg-white/[0.01] transition-colors"
                     style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto" }}
                     onClick={() => setExpanded(expanded === app.id ? null : app.id)}
                   >
                     <div className="min-w-0">
-                      <p className="text-[13px] text-[#e8e8e4] truncate">{app.fullName}</p>
-                      <p className="text-[11px] text-[#555] mt-0.5 truncate">{app.email}</p>
+                      <p className="text-[13px] text-[#ddd] truncate">{app.fullName}</p>
+                      <p className="text-[10px] text-[#444] mt-0.5 truncate">{app.email}</p>
                     </div>
-                    <p className="text-[13px] text-[#888] self-center">{app.age} · {app.city}</p>
-                    <p className="text-[13px] text-[#888] self-center truncate">{app.instagram}</p>
-                    <p className="text-[11px] text-[#555] self-center">
+                    <p className="text-[12px] text-[#777] self-center">{app.age} · {app.city}</p>
+                    <p className="text-[12px] text-[#777] self-center truncate">{app.instagram}</p>
+                    <p className="text-[10px] text-[#444] self-center">
                       {new Date(app.createdAt).toLocaleDateString("pt-BR")}
                     </p>
                     <div className="self-center">
-                      <span className={`inline-block px-2 py-1 rounded-sm border text-[9px] uppercase tracking-wider ${STATUS_COLORS[app.status]}`}>
+                      <span className={`inline-block px-2 py-1 rounded-sm border text-[8px] uppercase tracking-wider ${STATUS_COLORS[app.status]}`}>
                         {STATUS_LABELS[app.status]}
                       </span>
                     </div>
-                    <span className="text-[#333] text-xs self-center select-none">
+                    <span className="text-[#2a2a2a] text-xs self-center select-none">
                       {expanded === app.id ? "▲" : "▼"}
                     </span>
                   </div>
 
-                  {/* Expanded detail */}
+                  {/* ── Expanded detail ── */}
                   {expanded === app.id && (
-                    <div className="px-4 pb-8 pt-4 border-t border-white/[0.04] bg-white/[0.01]">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-                        <div>
-                          <p className="text-[9px] uppercase tracking-[0.2em] text-[#444] mb-1.5">WhatsApp</p>
-                          <p className="text-[13px] text-[#aaa]">{app.whatsapp}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] uppercase tracking-[0.2em] text-[#444] mb-1.5">Instagram</p>
-                          <p className="text-[13px] text-[#aaa]">{app.instagram}</p>
-                        </div>
-                        {app.project && (
-                          <div className="col-span-2">
-                            <p className="text-[9px] uppercase tracking-[0.2em] text-[#444] mb-1.5">Project / Company</p>
-                            <p className="text-[13px] text-[#aaa]">{app.project}</p>
+                    <div className="px-4 pb-8 pt-5 border-t border-white/[0.04] bg-white/[0.008]">
+
+                      {/* Contact info */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-6 pb-6 border-b border-white/[0.04]">
+                        {[
+                          ["WhatsApp",      app.whatsapp],
+                          ["Instagram",     app.instagram],
+                          ["Tem projeto?",  app.hasProject ? "Sim" : "Não"],
+                          ["Participação",  app.activeParticipation ? "Ativa" : "Não confirmada"],
+                        ].map(([l, v]) => (
+                          <div key={l}>
+                            <p className="text-[8px] uppercase tracking-[0.2em] text-[#333] mb-1.5">{l}</p>
+                            <p className="text-[12px] text-[#888]">{v}</p>
+                          </div>
+                        ))}
+                        {app.projectDescription && (
+                          <div className="col-span-2 md:col-span-4">
+                            <p className="text-[8px] uppercase tracking-[0.2em] text-[#333] mb-1.5">Projeto</p>
+                            <p className="text-[12px] text-[#888]">{app.projectDescription}</p>
                           </div>
                         )}
                       </div>
 
-                      <div className="mb-6">
-                        <p className="text-[9px] uppercase tracking-[0.2em] text-[#444] mb-2">Goals</p>
-                        <p className="text-[13px] text-[#888] leading-relaxed max-w-2xl">{app.goals}</p>
+                      {/* Questions */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 pb-6 border-b border-white/[0.04]">
+                        {QUESTIONS.map(({ key, label }) => {
+                          const val = app[key];
+                          if (!val || typeof val !== "string") return null;
+                          return (
+                            <div key={key}>
+                              <p className="text-[8px] uppercase tracking-[0.2em] text-[#333] mb-1.5">{label}</p>
+                              <p className="text-[12px] text-[#777] leading-relaxed">{val}</p>
+                            </div>
+                          );
+                        })}
                       </div>
 
                       {/* Status actions */}
-                      <div className="pt-4 border-t border-white/[0.05]">
-                        <p className="text-[9px] uppercase tracking-[0.2em] text-[#444] mb-3">Update status</p>
+                      <div className="mb-6 pb-6 border-b border-white/[0.04]">
+                        <p className="text-[8px] uppercase tracking-[0.2em] text-[#333] mb-3">
+                          Atualizar status
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           {(Object.keys(STATUS_LABELS) as Status[]).map((s) => (
                             <button
                               key={s}
                               disabled={app.status === s || updating === app.id}
                               onClick={(e) => { e.stopPropagation(); updateStatus(app.id, s); }}
-                              className={`px-3 py-1.5 text-[9px] uppercase tracking-wider border transition-all duration-300 ${
+                              className={`px-3 py-1.5 text-[8px] uppercase tracking-wider border transition-all ${
                                 app.status === s
                                   ? `${STATUS_COLORS[s]} cursor-default`
-                                  : "border-white/[0.08] text-[#555] hover:border-white/20 hover:text-[#e8e8e4] cursor-pointer"
-                              } disabled:opacity-40`}
+                                  : "border-white/[0.07] text-[#444] hover:border-white/20 hover:text-[#aaa] cursor-pointer"
+                              } disabled:opacity-30`}
                             >
                               {updating === app.id ? "..." : STATUS_LABELS[s]}
                             </button>
                           ))}
                         </div>
                       </div>
+
+                      {/* Admin notes */}
+                      <NotesEditor app={app} onSave={() => fetchApplications(search, filter)} />
+
                     </div>
                   )}
                 </div>
               ))}
             </div>
 
-            <p className="mt-6 text-[9px] uppercase tracking-widest text-[#333] text-right">
-              {applications.length} result{applications.length !== 1 ? "s" : ""}
+            <p className="mt-6 text-[8px] uppercase tracking-widest text-[#222] text-right">
+              {applications.length} resultado{applications.length !== 1 ? "s" : ""}
             </p>
-          </div>
+          </>
         )}
       </div>
     </div>

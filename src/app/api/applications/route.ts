@@ -3,6 +3,25 @@ import { prisma } from "@/lib/db";
 import { sendConfirmationEmail, sendAdminNotification } from "@/lib/email";
 import { z } from "zod";
 
+// ─── Rate limiting (in-memory) ────────────────────────────────────────────────
+const rateMap = new Map<string, { count: number; reset: number }>();
+const RATE_LIMIT  = 3;          // max submissions per window
+const WINDOW_MS   = 15 * 60 * 1000; // 15 minutes
+
+function isRateLimited(ip: string): boolean {
+  const now   = Date.now();
+  const entry = rateMap.get(ip);
+
+  if (!entry || now > entry.reset) {
+    rateMap.set(ip, { count: 1, reset: now + WINDOW_MS });
+    return false;
+  }
+  if (entry.count >= RATE_LIMIT) return true;
+  entry.count++;
+  return false;
+}
+
+// ─── Schema ───────────────────────────────────────────────────────────────────
 const schema = z.object({
   fullName:            z.string().min(2).max(100),
   age:                 z.number().int().min(14).max(40),
@@ -20,14 +39,40 @@ const schema = z.object({
   whySelected:         z.string().min(5).max(2000),
   activeParticipation: z.boolean(),
   dreamConversation:   z.string().min(5).max(2000),
+  // Honeypot — must be empty/absent; bots fill it
+  _hp:                 z.string().max(0).optional(),
 });
 
+// ─── Handler ──────────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
+  // IP rate limiting
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
+  if (isRateLimited(ip)) {
+    return NextResponse.json(
+      { error: "Muitas tentativas. Aguarde 15 minutos." },
+      { status: 429 }
+    );
+  }
+
   try {
     const body = await req.json();
-    const data = schema.parse(body);
 
-    const application = await prisma.application.create({ data });
+    // Honeypot check — bots fill hidden fields
+    if (body._hp && body._hp.length > 0) {
+      return NextResponse.json({ success: true }, { status: 201 }); // silent reject
+    }
+
+    // Basic bot signals
+    const ua = req.headers.get("user-agent") ?? "";
+    const suspiciousUA = !ua || ua.length < 10 || /bot|crawl|spider|curl|wget|python|axios/i.test(ua);
+    if (suspiciousUA) {
+      return NextResponse.json({ success: true }, { status: 201 }); // silent reject
+    }
+
+    const data = schema.parse(body);
+    const { _hp, ...appData } = data; // strip honeypot
+
+    const application = await prisma.application.create({ data: appData });
 
     void sendConfirmationEmail(application);
     void sendAdminNotification(application);
@@ -40,7 +85,7 @@ export async function POST(req: NextRequest) {
     if ((err as { code?: string })?.code === "P2002") {
       return NextResponse.json({ error: "Email already submitted" }, { status: 409 });
     }
-    console.error("[api] Application submission error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("[api] Application error:", err);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

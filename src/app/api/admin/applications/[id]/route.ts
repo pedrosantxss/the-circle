@@ -9,20 +9,32 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await context.params;
-    const { status } = await req.json();
+    const { id }  = await context.params;
+    const body    = await req.json();
+    const data: { status?: Status; adminNotes?: string } = {};
 
-    if (!VALID.includes(status)) {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    if (body.status !== undefined) {
+      if (!VALID.includes(body.status)) {
+        return NextResponse.json({ error: "Status inválido" }, { status: 400 });
+      }
+      data.status = body.status as Status;
+    }
+
+    if (body.adminNotes !== undefined) {
+      data.adminNotes = String(body.adminNotes);
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: "Nenhum campo para atualizar" }, { status: 400 });
     }
 
     const application = await prisma.application.update({
       where: { id },
-      data: { status: status as Status },
+      data,
     });
 
     return NextResponse.json(application);
   } catch {
-    return NextResponse.json({ error: "Not found or update failed" }, { status: 404 });
+    return NextResponse.json({ error: "Não encontrado ou falha na atualização" }, { status: 404 });
   }
 }

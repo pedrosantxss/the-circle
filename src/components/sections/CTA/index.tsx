@@ -118,6 +118,7 @@ export function CTASection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          _hp:                 "",   // honeypot must be empty
           age:                 parseInt(form.age, 10),
           instagram:           form.instagram.startsWith("@") ? form.instagram : `@${form.instagram}`,
           hasProject:          form.hasProject === "Sim",
@@ -220,6 +221,16 @@ export function CTASection() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-0">
+
+              {/* Honeypot — hidden from humans, traps bots */}
+              <input
+                type="text"
+                name="_hp"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }}
+              />
 
               {/* ── Informações básicas ── */}
               <SectionDivider label="Informações" />
