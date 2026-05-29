@@ -1,16 +1,80 @@
 "use client";
 
-import { useRef } from "react";
+import { useState, useRef } from "react";
 import { motion, useInView } from "framer-motion";
 import { Container } from "@/components/ui/Container";
 import { useLang } from "@/lib/LanguageContext";
 import { translations } from "@/lib/translations";
+
+type FormData = {
+  fullName:  string;
+  age:       string;
+  city:      string;
+  email:     string;
+  whatsapp:  string;
+  instagram: string;
+  goals:     string;
+  project:   string;
+};
+
+const EMPTY: FormData = {
+  fullName: "", age: "", city: "", email: "",
+  whatsapp: "", instagram: "", goals: "", project: "",
+};
+
+const inputClass =
+  "w-full bg-graphite/50 border border-white/10 px-5 py-4 text-body-sm text-ivory placeholder-ghost font-mono focus:outline-none focus:border-white/30 transition-colors duration-300";
 
 export function CTASection() {
   const ref      = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-10%" });
   const { lang } = useLang();
   const t        = translations[lang].cta;
+  const f        = t.form;
+
+  const [form, setForm]       = useState<FormData>(EMPTY);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+
+  function field(key: keyof FormData) {
+    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((prev) => ({ ...prev, [key]: e.target.value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          age: parseInt(form.age, 10),
+          instagram: form.instagram.startsWith("@")
+            ? form.instagram
+            : `@${form.instagram}`,
+          project: form.project || undefined,
+        }),
+      });
+
+      if (res.status === 201) {
+        setSuccess(true);
+        setForm(EMPTY);
+      } else if (res.status === 409) {
+        setError(f.errorDuplicate);
+      } else {
+        setError(f.errorGeneric);
+      }
+    } catch {
+      setError(f.errorGeneric);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <section id="join" className="relative bg-void section-pad overflow-hidden">
@@ -59,24 +123,116 @@ export function CTASection() {
             {t.sub}
           </motion.p>
 
-          {/* Form */}
-          <motion.form
+          {/* Form / Success */}
+          <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.75 }}
-            onSubmit={(e) => e.preventDefault()}
-            className="mt-12 flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
+            className="mt-12 max-w-xl mx-auto text-left"
           >
-            <input
-              type="email"
-              required
-              placeholder={t.placeholder}
-              className="flex-1 bg-graphite/50 border border-white/10 px-5 py-4 text-body-sm text-ivory placeholder-ghost font-mono focus:outline-none focus:border-white/30 transition-colors duration-300"
-            />
-            <button type="submit" className="btn-primary whitespace-nowrap">
-              {t.button}
-            </button>
-          </motion.form>
+            {success ? (
+              <div className="text-center py-16 border border-white/[0.08] px-8">
+                <p className="font-display italic text-2xl text-ivory mb-3">{f.success}</p>
+                <p className="text-body-sm text-mist">{f.successSub}</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+
+                {/* Name + Age */}
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_100px] gap-4">
+                  <input
+                    type="text"
+                    required
+                    placeholder={f.fullName}
+                    value={form.fullName}
+                    onChange={field("fullName")}
+                    className={inputClass}
+                  />
+                  <input
+                    type="number"
+                    required
+                    min={16}
+                    max={35}
+                    placeholder={f.age}
+                    value={form.age}
+                    onChange={field("age")}
+                    className={inputClass}
+                  />
+                </div>
+
+                {/* City */}
+                <input
+                  type="text"
+                  required
+                  placeholder={f.city}
+                  value={form.city}
+                  onChange={field("city")}
+                  className={inputClass}
+                />
+
+                {/* Email */}
+                <input
+                  type="email"
+                  required
+                  placeholder={f.email}
+                  value={form.email}
+                  onChange={field("email")}
+                  className={inputClass}
+                />
+
+                {/* WhatsApp + Instagram */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <input
+                    type="tel"
+                    required
+                    placeholder={f.whatsapp}
+                    value={form.whatsapp}
+                    onChange={field("whatsapp")}
+                    className={inputClass}
+                  />
+                  <input
+                    type="text"
+                    required
+                    placeholder={f.instagram}
+                    value={form.instagram}
+                    onChange={field("instagram")}
+                    className={inputClass}
+                  />
+                </div>
+
+                {/* Goals */}
+                <textarea
+                  required
+                  rows={4}
+                  placeholder={`${f.goals} — ${f.goalsHint}`}
+                  value={form.goals}
+                  onChange={field("goals")}
+                  className={`${inputClass} resize-none`}
+                />
+
+                {/* Project optional */}
+                <input
+                  type="text"
+                  placeholder={`${f.project} — ${f.projectHint}`}
+                  value={form.project}
+                  onChange={field("project")}
+                  className={inputClass}
+                />
+
+                {error && (
+                  <p className="text-red-400/80 text-[0.7rem] font-mono tracking-wide">{error}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full btn-primary disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+                >
+                  {loading ? "·  ·  ·" : t.button}
+                </button>
+              </form>
+            )}
+          </motion.div>
 
           <motion.p
             initial={{ opacity: 0 }}
