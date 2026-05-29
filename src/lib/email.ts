@@ -28,7 +28,7 @@ interface ApplicationData {
 export async function sendConfirmationEmail(app: ApplicationData) {
   try {
     await getResend().emails.send({
-      from:    "The Circle <noreply@thecirclejr.com>",
+      from:    "The Circle <noreply@thecirclerj.com>",
       to:      app.email,
       subject: "Aplicação recebida — The Circle",
       html: `
@@ -74,8 +74,8 @@ export async function sendConfirmationEmail(app: ApplicationData) {
 export async function sendAdminNotification(app: ApplicationData) {
   try {
     await getResend().emails.send({
-      from:    "The Circle <noreply@thecirclejr.com>",
-      to:      "contato@thecirclejr.com",
+      from:    "The Circle <noreply@thecirclerj.com>",
+      to:      "contato@thecirclerj.com",
       subject: `Nova aplicação: ${app.fullName} · ${app.city}`,
       html: `
         <div style="font-family:ui-monospace,monospace;max-width:640px;margin:0 auto;background:#050505;color:#e8e8e4;padding:48px 40px;">
@@ -107,7 +107,7 @@ export async function sendAdminNotification(app: ApplicationData) {
           ${block("Conversa de 1h — com quem e por quê?", app.dreamConversation)}
 
           <div style="margin-top:36px;padding-top:24px;border-top:1px solid #111;">
-            <a href="https://thecirclejr.com/admin"
+            <a href="https://thecirclerj.com/admin"
                style="font-size:10px;color:#e8e8e4;letter-spacing:0.2em;text-transform:uppercase;text-decoration:none;">
               Ver no painel →
             </a>
