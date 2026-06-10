@@ -38,3 +38,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Não encontrado ou falha na atualização" }, { status: 404 });
   }
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params;
+    await prisma.application.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+  }
+}

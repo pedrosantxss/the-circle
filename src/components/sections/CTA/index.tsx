@@ -26,6 +26,8 @@ type FormData = {
   dreamConversation:   string;
 };
 
+type FormErrors = Partial<Record<keyof FormData, string>>;
+
 const EMPTY: FormData = {
   fullName: "", age: "", city: "", instagram: "",
   whatsapp: "", email: "", focus: "", whyJoin: "",
@@ -34,13 +36,64 @@ const EMPTY: FormData = {
   activeParticipation: "", dreamConversation: "",
 };
 
+// ─── Validation ───────────────────────────────────────────────────────────────
+function validateForm(f: FormData): FormErrors {
+  const e: FormErrors = {};
+  if (f.fullName.trim().length < 2)
+    e.fullName = "Digite seu nome completo.";
+  const ageNum = parseInt(f.age, 10);
+  if (!f.age || isNaN(ageNum) || ageNum < 14 || ageNum > 40)
+    e.age = "Idade deve ser entre 14 e 40 anos.";
+  if (f.city.trim().length < 2)
+    e.city = "Digite sua cidade.";
+  if (!f.instagram.trim())
+    e.instagram = "Digite seu Instagram.";
+  if (f.whatsapp.replace(/\D/g, "").length < 8)
+    e.whatsapp = "Digite um WhatsApp válido (mínimo 8 dígitos).";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email))
+    e.email = "Digite um e-mail válido.";
+  if (f.focus.trim().length < 5)
+    e.focus = "Explique seu foco atual com pelo menos 5 caracteres.";
+  if (f.whyJoin.trim().length < 5)
+    e.whyJoin = "Explique por que deseja entrar para The Circle.";
+  if (f.goal12months.trim().length < 5)
+    e.goal12months = "Descreva seu objetivo para os próximos 12 meses.";
+  if (!f.hasProject)
+    e.hasProject = "Selecione uma opção.";
+  if (f.desiredConnections.trim().length < 5)
+    e.desiredConnections = "Descreva o tipo de conexão que procura.";
+  if (f.contribution.trim().length < 5)
+    e.contribution = "Explique como pode contribuir para a comunidade.";
+  if (f.whySelected.trim().length < 5)
+    e.whySelected = "Explique por que deveria ser selecionado.";
+  if (!f.activeParticipation)
+    e.activeParticipation = "Selecione uma opção.";
+  if (f.dreamConversation.trim().length < 5)
+    e.dreamConversation = "Escreva com quem gostaria de conversar e por quê.";
+  return e;
+}
+
 // ─── Shared styles ────────────────────────────────────────────────────────────
-const INPUT =
-  "w-full bg-white/[0.03] border border-white/[0.08] px-5 py-4 text-[0.82rem] text-ivory placeholder-white/20 font-mono focus:outline-none focus:border-white/25 transition-colors duration-300";
-const TEXTAREA =
-  "w-full bg-white/[0.03] border border-white/[0.08] px-5 py-4 text-[0.82rem] text-ivory placeholder-white/20 font-mono focus:outline-none focus:border-white/25 transition-colors duration-300 resize-none leading-relaxed";
+const inputCls = (err?: string) =>
+  `w-full bg-white/[0.03] border ${
+    err ? "border-red-500/40" : "border-white/[0.08]"
+  } px-5 py-4 text-[0.82rem] text-ivory placeholder-white/20 font-mono focus:outline-none focus:border-white/25 transition-colors duration-300`;
+
+const textareaCls = (err?: string) =>
+  `w-full bg-white/[0.03] border ${
+    err ? "border-red-500/40" : "border-white/[0.08]"
+  } px-5 py-4 text-[0.82rem] text-ivory placeholder-white/20 font-mono focus:outline-none focus:border-white/25 transition-colors duration-300 resize-none leading-relaxed`;
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+function FieldError({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return (
+    <p className="text-[0.65rem] text-red-400/75 font-mono mt-1.5 tracking-wide">
+      {msg}
+    </p>
+  );
+}
+
 function SectionDivider({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-4 my-10">
@@ -52,10 +105,10 @@ function SectionDivider({ label }: { label: string }) {
 }
 
 function Question({
-  number, text, children,
-}: { number: string; text: string; children: React.ReactNode }) {
+  id, number, text, children,
+}: { id: string; number: string; text: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-3">
+    <div id={id} className="space-y-3">
       <div className="flex items-start gap-3">
         <span className="font-mono text-[0.58rem] text-white/20 mt-1 shrink-0 tabular-nums">{number}</span>
         <label className="text-[0.82rem] text-white/55 leading-relaxed font-sans">{text}</label>
@@ -66,24 +119,29 @@ function Question({
 }
 
 function YesNoToggle({
-  value, onChange,
-}: { value: YesNo; onChange: (v: YesNo) => void }) {
+  value, onChange, error,
+}: { value: YesNo; onChange: (v: YesNo) => void; error?: string }) {
   return (
-    <div className="flex gap-3">
-      {(["Sim", "Não"] as const).map((opt) => (
-        <button
-          type="button"
-          key={opt}
-          onClick={() => onChange(opt)}
-          className={`px-8 py-3 font-mono text-[0.7rem] uppercase tracking-[0.2em] border transition-all duration-300 ${
-            value === opt
-              ? "border-white/35 text-ivory bg-white/[0.05]"
-              : "border-white/[0.08] text-white/30 hover:border-white/20 hover:text-white/55"
-          }`}
-        >
-          {opt}
-        </button>
-      ))}
+    <div>
+      <div className="flex gap-3">
+        {(["Sim", "Não"] as const).map((opt) => (
+          <button
+            type="button"
+            key={opt}
+            onClick={() => onChange(opt)}
+            className={`px-8 py-3 font-mono text-[0.7rem] uppercase tracking-[0.2em] border transition-all duration-300 ${
+              value === opt
+                ? "border-white/35 text-ivory bg-white/[0.05]"
+                : error
+                ? "border-red-500/30 text-white/30 hover:border-white/20 hover:text-white/55"
+                : "border-white/[0.08] text-white/30 hover:border-white/20 hover:text-white/55"
+            }`}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+      <FieldError msg={error} />
     </div>
   );
 }
@@ -94,21 +152,32 @@ export function CTASection() {
   const isInView = useInView(ref, { once: true, margin: "-10%" });
 
   const [form, setForm]       = useState<FormData>(EMPTY);
+  const [errors, setErrors]   = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
   function set(key: keyof FormData) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setForm((p) => ({ ...p, [key]: e.target.value }));
+      if (errors[key]) setErrors((p) => ({ ...p, [key]: undefined }));
+    };
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.hasProject || !form.activeParticipation) {
-      setError("Por favor, responda todas as perguntas de sim/não.");
+
+    // Client-side validation
+    const errs = validateForm(form);
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      const firstKey = Object.keys(errs)[0] as keyof FormData;
+      const el = document.getElementById(`field-${firstKey}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
+
+    setErrors({});
     setLoading(true);
     setError(null);
 
@@ -118,7 +187,7 @@ export function CTASection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          _hp:                 "",   // honeypot must be empty
+          _hp:                 "",
           age:                 parseInt(form.age, 10),
           instagram:           form.instagram.startsWith("@") ? form.instagram : `@${form.instagram}`,
           hasProject:          form.hasProject === "Sim",
@@ -133,8 +202,6 @@ export function CTASection() {
         setError("Este e-mail já realizou uma aplicação.");
       } else if (res.status === 429) {
         setError("Muitas tentativas. Aguarde 15 minutos e tente novamente.");
-      } else if (res.status === 400) {
-        setError("Verifique os campos e tente novamente.");
       } else {
         setError("Algo correu mal. Tente novamente.");
       }
@@ -230,13 +297,9 @@ export function CTASection() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-0">
 
-              {/* Honeypot — hidden from humans, traps bots */}
+              {/* Honeypot */}
               <input
-                type="text"
-                name="_hp"
-                tabIndex={-1}
-                autoComplete="off"
-                aria-hidden="true"
+                type="text" name="_hp" tabIndex={-1} autoComplete="off" aria-hidden="true"
                 style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }}
               />
 
@@ -246,26 +309,50 @@ export function CTASection() {
               <div className="space-y-4">
                 {/* Name + Age */}
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_90px] gap-4">
-                  <input type="text" required placeholder="Nome completo"
-                    value={form.fullName} onChange={set("fullName")} className={INPUT} />
-                  <input type="number" required min={14} max={40} placeholder="Idade"
-                    value={form.age} onChange={set("age")} className={INPUT} />
+                  <div id="field-fullName">
+                    <input type="text" required placeholder="Nome completo"
+                      value={form.fullName} onChange={set("fullName")}
+                      className={inputCls(errors.fullName)} />
+                    <FieldError msg={errors.fullName} />
+                  </div>
+                  <div id="field-age">
+                    <input type="number" required min={14} max={40} placeholder="Idade"
+                      value={form.age} onChange={set("age")}
+                      className={inputCls(errors.age)} />
+                    <FieldError msg={errors.age} />
+                  </div>
                 </div>
 
                 {/* City + Instagram */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <input type="text" required placeholder="Cidade"
-                    value={form.city} onChange={set("city")} className={INPUT} />
-                  <input type="text" required placeholder="Instagram"
-                    value={form.instagram} onChange={set("instagram")} className={INPUT} />
+                  <div id="field-city">
+                    <input type="text" required placeholder="Cidade"
+                      value={form.city} onChange={set("city")}
+                      className={inputCls(errors.city)} />
+                    <FieldError msg={errors.city} />
+                  </div>
+                  <div id="field-instagram">
+                    <input type="text" required placeholder="Instagram"
+                      value={form.instagram} onChange={set("instagram")}
+                      className={inputCls(errors.instagram)} />
+                    <FieldError msg={errors.instagram} />
+                  </div>
                 </div>
 
                 {/* WhatsApp + Email */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <input type="tel" required placeholder="WhatsApp"
-                    value={form.whatsapp} onChange={set("whatsapp")} className={INPUT} />
-                  <input type="email" required placeholder="E-mail"
-                    value={form.email} onChange={set("email")} className={INPUT} />
+                  <div id="field-whatsapp">
+                    <input type="tel" required placeholder="WhatsApp"
+                      value={form.whatsapp} onChange={set("whatsapp")}
+                      className={inputCls(errors.whatsapp)} />
+                    <FieldError msg={errors.whatsapp} />
+                  </div>
+                  <div id="field-email">
+                    <input type="email" required placeholder="E-mail"
+                      value={form.email} onChange={set("email")}
+                      className={inputCls(errors.email)} />
+                    <FieldError msg={errors.email} />
+                  </div>
                 </div>
               </div>
 
@@ -274,51 +361,83 @@ export function CTASection() {
 
               <div className="space-y-8">
 
-                <Question number="01" text="No que você está focado neste momento?">
-                  <textarea required rows={3} placeholder="Compartilhe o que está ocupando mais sua energia e atenção..."
-                    value={form.focus} onChange={set("focus")} className={TEXTAREA} />
+                <Question id="field-focus" number="01" text="No que você está focado neste momento?">
+                  <textarea required rows={3}
+                    placeholder="Compartilhe o que está ocupando mais sua energia e atenção..."
+                    value={form.focus} onChange={set("focus")}
+                    className={textareaCls(errors.focus)} />
+                  <FieldError msg={errors.focus} />
                 </Question>
 
-                <Question number="02" text="Por que deseja entrar para a THE CIRCLE?">
-                  <textarea required rows={3} placeholder="O que te trouxe até aqui e o que espera encontrar..."
-                    value={form.whyJoin} onChange={set("whyJoin")} className={TEXTAREA} />
+                <Question id="field-whyJoin" number="02" text="Por que deseja entrar para a THE CIRCLE?">
+                  <textarea required rows={3}
+                    placeholder="O que te trouxe até aqui e o que espera encontrar..."
+                    value={form.whyJoin} onChange={set("whyJoin")}
+                    className={textareaCls(errors.whyJoin)} />
+                  <FieldError msg={errors.whyJoin} />
                 </Question>
 
-                <Question number="03" text="Qual é seu principal objetivo para os próximos 12 meses?">
-                  <textarea required rows={3} placeholder="Seja específico. Onde quer estar daqui a um ano?"
-                    value={form.goal12months} onChange={set("goal12months")} className={TEXTAREA} />
+                <Question id="field-goal12months" number="03" text="Qual é seu principal objetivo para os próximos 12 meses?">
+                  <textarea required rows={3}
+                    placeholder="Seja específico. Onde quer estar daqui a um ano?"
+                    value={form.goal12months} onChange={set("goal12months")}
+                    className={textareaCls(errors.goal12months)} />
+                  <FieldError msg={errors.goal12months} />
                 </Question>
 
-                <Question number="04" text="Você possui algum projeto, startup, negócio ou ideia que deseja desenvolver?">
-                  <YesNoToggle value={form.hasProject}
-                    onChange={(v) => setForm((p) => ({ ...p, hasProject: v }))} />
+                <Question id="field-hasProject" number="04" text="Você possui algum projeto, startup, negócio ou ideia que deseja desenvolver?">
+                  <YesNoToggle
+                    value={form.hasProject}
+                    error={errors.hasProject}
+                    onChange={(v) => {
+                      setForm((p) => ({ ...p, hasProject: v }));
+                      if (errors.hasProject) setErrors((p) => ({ ...p, hasProject: undefined }));
+                    }}
+                  />
                 </Question>
 
                 {form.hasProject === "Sim" && (
-                  <Question number="04a" text="Se sim, qual?">
-                    <textarea rows={2} placeholder="Descreva brevemente o que é, em que estágio está..."
-                      value={form.projectDescription} onChange={set("projectDescription")} className={TEXTAREA} />
+                  <Question id="field-projectDescription" number="04a" text="Se sim, qual?">
+                    <textarea rows={2}
+                      placeholder="Descreva brevemente o que é, em que estágio está..."
+                      value={form.projectDescription} onChange={set("projectDescription")}
+                      className={textareaCls()} />
                   </Question>
                 )}
 
-                <Question number="05" text="Que tipo de pessoas você deseja conhecer dentro da THE CIRCLE?">
-                  <textarea required rows={2} placeholder="Perfis, áreas, mentalidades..."
-                    value={form.desiredConnections} onChange={set("desiredConnections")} className={TEXTAREA} />
+                <Question id="field-desiredConnections" number="05" text="Que tipo de pessoas você deseja conhecer dentro da THE CIRCLE?">
+                  <textarea required rows={2}
+                    placeholder="Perfis, áreas, mentalidades..."
+                    value={form.desiredConnections} onChange={set("desiredConnections")}
+                    className={textareaCls(errors.desiredConnections)} />
+                  <FieldError msg={errors.desiredConnections} />
                 </Question>
 
-                <Question number="06" text="O que você acredita que pode agregar para a comunidade?">
-                  <textarea required rows={3} placeholder="Conhecimento, experiências, habilidades, perspectivas..."
-                    value={form.contribution} onChange={set("contribution")} className={TEXTAREA} />
+                <Question id="field-contribution" number="06" text="O que você acredita que pode agregar para a comunidade?">
+                  <textarea required rows={3}
+                    placeholder="Conhecimento, experiências, habilidades, perspectivas..."
+                    value={form.contribution} onChange={set("contribution")}
+                    className={textareaCls(errors.contribution)} />
+                  <FieldError msg={errors.contribution} />
                 </Question>
 
-                <Question number="07" text="Por que você deveria ser selecionado?">
-                  <textarea required rows={3} placeholder="Sua resposta mais honesta e direta..."
-                    value={form.whySelected} onChange={set("whySelected")} className={TEXTAREA} />
+                <Question id="field-whySelected" number="07" text="Por que você deveria ser selecionado?">
+                  <textarea required rows={3}
+                    placeholder="Sua resposta mais honesta e direta..."
+                    value={form.whySelected} onChange={set("whySelected")}
+                    className={textareaCls(errors.whySelected)} />
+                  <FieldError msg={errors.whySelected} />
                 </Question>
 
-                <Question number="08" text="Você está disposto a participar ativamente da comunidade e contribuir com outros membros?">
-                  <YesNoToggle value={form.activeParticipation}
-                    onChange={(v) => setForm((p) => ({ ...p, activeParticipation: v }))} />
+                <Question id="field-activeParticipation" number="08" text="Você está disposto a participar ativamente da comunidade e contribuir com outros membros?">
+                  <YesNoToggle
+                    value={form.activeParticipation}
+                    error={errors.activeParticipation}
+                    onChange={(v) => {
+                      setForm((p) => ({ ...p, activeParticipation: v }));
+                      if (errors.activeParticipation) setErrors((p) => ({ ...p, activeParticipation: undefined }));
+                    }}
+                  />
                 </Question>
 
               </div>
@@ -326,12 +445,13 @@ export function CTASection() {
               {/* ── Última pergunta ── */}
               <SectionDivider label="Última pergunta" />
 
-              <Question number="09"
+              <Question id="field-dreamConversation" number="09"
                 text="Se pudesse conversar durante uma hora com qualquer empreendedor, fundador ou líder de negócios do mundo, quem seria e por quê?">
                 <textarea required rows={4}
                   placeholder="Qualquer pessoa, viva ou não. O que você aprenderia nessa conversa?"
                   value={form.dreamConversation} onChange={set("dreamConversation")}
-                  className={TEXTAREA} />
+                  className={textareaCls(errors.dreamConversation)} />
+                <FieldError msg={errors.dreamConversation} />
               </Question>
 
               {/* ── Error + Submit ── */}
