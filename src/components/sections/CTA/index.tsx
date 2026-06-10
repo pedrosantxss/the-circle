@@ -134,13 +134,9 @@ export function CTASection() {
       } else if (res.status === 429) {
         setError("Muitas tentativas. Aguarde 15 minutos e tente novamente.");
       } else if (res.status === 400) {
-        let detail = "";
-        try { const j = await res.json(); detail = JSON.stringify(j.error ?? j); } catch {/* */}
-        setError(`Dados inválidos. Verifique os campos. ${detail}`);
+        setError("Verifique os campos e tente novamente.");
       } else {
-        let detail = "";
-        try { const j = await res.json(); detail = j.error ?? j.code ?? ""; } catch {/* */}
-        setError(`Erro ao enviar candidatura. ${detail}`);
+        setError("Algo correu mal. Tente novamente.");
       }
     } catch {
       setError("Erro de conexão. Tente novamente.");

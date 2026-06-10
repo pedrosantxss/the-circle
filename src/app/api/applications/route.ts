@@ -85,9 +85,7 @@ export async function POST(req: NextRequest) {
     if ((err as { code?: string })?.code === "P2002") {
       return NextResponse.json({ error: "Email already submitted" }, { status: 409 });
     }
-    const message = err instanceof Error ? err.message : String(err);
-    const code    = (err as { code?: string })?.code ?? "unknown";
     console.error("[api] Application error:", err);
-    return NextResponse.json({ error: message, code }, { status: 500 });
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }
