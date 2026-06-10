@@ -127,9 +127,21 @@ export function CTASection() {
         }),
       });
 
-      if (res.status === 201)      { setSuccess(true); setForm(EMPTY); }
-      else if (res.status === 409) { setError("Este e-mail já realizou uma aplicação."); }
-      else                         { setError("Algo correu mal. Tente novamente."); }
+      if (res.status === 201) {
+        setSuccess(true); setForm(EMPTY);
+      } else if (res.status === 409) {
+        setError("Este e-mail já realizou uma aplicação.");
+      } else if (res.status === 429) {
+        setError("Muitas tentativas. Aguarde 15 minutos e tente novamente.");
+      } else if (res.status === 400) {
+        let detail = "";
+        try { const j = await res.json(); detail = JSON.stringify(j.error ?? j); } catch {/* */}
+        setError(`Dados inválidos. Verifique os campos. ${detail}`);
+      } else {
+        let detail = "";
+        try { const j = await res.json(); detail = j.error ?? j.code ?? ""; } catch {/* */}
+        setError(`Erro ao enviar candidatura. ${detail}`);
+      }
     } catch {
       setError("Erro de conexão. Tente novamente.");
     } finally {
