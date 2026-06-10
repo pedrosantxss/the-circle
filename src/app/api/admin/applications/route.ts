@@ -26,10 +26,16 @@ export async function GET(req: NextRequest) {
       : {}),
   };
 
-  const applications = await prisma.application.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-  });
-
-  return NextResponse.json(applications);
+  try {
+    const applications = await prisma.application.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+    });
+    return NextResponse.json(applications);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const code    = (err as { code?: string })?.code ?? "unknown";
+    console.error("[admin/applications] GET error:", err);
+    return NextResponse.json({ error: message, code }, { status: 500 });
+  }
 }
