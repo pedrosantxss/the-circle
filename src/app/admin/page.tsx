@@ -100,6 +100,16 @@ function NotesEditor({ app, onSave }: { app: Application; onSave: () => void }) 
   );
 }
 
+// ─── BlockLog types ───────────────────────────────────────────────────────────
+interface BlockEntry {
+  ip:           string;
+  reason:       string;
+  reasonLabel:  string;
+  userAgent:    string;
+  blockedAt:    number;
+  blockedAtISO: string;
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const router = useRouter();
@@ -111,6 +121,19 @@ export default function AdminPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const searchTimeout           = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const [blocked, setBlocked]         = useState<BlockEntry[]>([]);
+  const [blockedTotal, setBlockedTotal] = useState(0);
+  const [showBlocked, setShowBlocked] = useState(false);
+
+  const fetchBlocked = useCallback(async () => {
+    try {
+      const res  = await fetch("/api/admin/blocked");
+      const data = await res.json();
+      setBlocked(Array.isArray(data.blocks) ? data.blocks : []);
+      setBlockedTotal(data.total ?? 0);
+    } catch {/* ignore */}
+  }, []);
 
   const fetchApplications = useCallback(async (s: string, f: string) => {
     setLoading(true);
@@ -128,6 +151,9 @@ export default function AdminPage() {
     searchTimeout.current = setTimeout(() => fetchApplications(search, filter), 300);
     return () => clearTimeout(searchTimeout.current);
   }, [search, filter, fetchApplications]);
+
+  // Load block log on mount
+  useEffect(() => { fetchBlocked(); }, [fetchBlocked]);
 
   async function updateStatus(id: string, status: Status) {
     setUpdating(id);
@@ -330,6 +356,84 @@ export default function AdminPage() {
             </p>
           </>
         )}
+        {/* ── Blocked attempts ── */}
+        <div className="mt-16 pt-8 border-t border-white/[0.04]">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <p className="text-[9px] uppercase tracking-[0.25em] text-[#444]">
+                Tentativas bloqueadas
+              </p>
+              {blockedTotal > 0 && (
+                <span className="px-2 py-0.5 text-[8px] font-mono border border-red-400/20 text-red-400/60 bg-red-400/5">
+                  {blockedTotal}
+                </span>
+              )}
+              <p className="text-[8px] text-[#222]">(instância atual · memória)</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={fetchBlocked}
+                style={MONO}
+                className="text-[8px] uppercase tracking-[0.15em] text-[#333] hover:text-[#777] transition-colors"
+              >
+                Atualizar
+              </button>
+              {blockedTotal > 0 && (
+                <button
+                  onClick={() => setShowBlocked((v) => !v)}
+                  style={MONO}
+                  className="text-[8px] uppercase tracking-[0.15em] text-[#333] hover:text-[#777] transition-colors"
+                >
+                  {showBlocked ? "Ocultar" : "Mostrar"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {blockedTotal === 0 && (
+            <p className="text-[10px] text-[#1c1c1c] font-mono">Nenhum bloqueio registrado.</p>
+          )}
+
+          {showBlocked && blocked.length > 0 && (
+            <div className="space-y-0 border border-white/[0.04]">
+              {/* Header */}
+              <div
+                className="hidden md:grid gap-4 px-4 py-2 text-[7px] uppercase tracking-[0.2em] text-[#2a2a2a] border-b border-white/[0.04]"
+                style={{ gridTemplateColumns: "120px 160px 1fr 1fr" }}
+              >
+                <span>Motivo</span>
+                <span>IP</span>
+                <span>Horário</span>
+                <span>User-Agent</span>
+              </div>
+              {blocked.map((b, i) => {
+                const reasonColor =
+                  b.reason === "rate_limit" ? "text-yellow-400/60 border-yellow-400/20 bg-yellow-400/5" :
+                  b.reason === "honeypot"   ? "text-red-400/60 border-red-400/20 bg-red-400/5" :
+                                              "text-orange-400/60 border-orange-400/20 bg-orange-400/5";
+                return (
+                  <div
+                    key={i}
+                    className="grid gap-4 px-4 py-2.5 border-b border-white/[0.02] text-[10px]"
+                    style={{ gridTemplateColumns: "120px 160px 1fr 1fr" }}
+                  >
+                    <span className={`inline-flex items-center px-1.5 py-0.5 border text-[7px] uppercase tracking-wider w-fit ${reasonColor}`}>
+                      {b.reasonLabel}
+                    </span>
+                    <span className="text-[#555] font-mono self-center">{b.ip}</span>
+                    <span className="text-[#333] font-mono self-center">
+                      {new Date(b.blockedAt).toLocaleString("pt-BR")}
+                    </span>
+                    <span className="text-[#2a2a2a] font-mono self-center truncate" title={b.userAgent}>
+                      {b.userAgent.substring(0, 60)}{b.userAgent.length > 60 ? "…" : ""}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

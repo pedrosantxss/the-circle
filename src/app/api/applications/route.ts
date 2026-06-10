@@ -1,24 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendConfirmationEmail, sendAdminNotification } from "@/lib/email";
+import { addBlock } from "@/lib/blockLog";
 import { z } from "zod";
 
-// ─── Rate limiting (in-memory) ────────────────────────────────────────────────
-const rateMap = new Map<string, { count: number; reset: number }>();
-const RATE_LIMIT  = 3;          // max submissions per window
-const WINDOW_MS   = 15 * 60 * 1000; // 15 minutes
+// ─── Rate limit config ────────────────────────────────────────────────────────
+const IS_DEV     = process.env.NODE_ENV === "development";
+const WINDOW_MS  = IS_DEV ? 30_000 : 15 * 60 * 1000;   // 30s dev, 15min prod
+const RATE_LIMIT = IS_DEV ? 20   : 3;                   // 20 dev, 3 prod
 
-function isRateLimited(ip: string): boolean {
+// IP whitelist — comma-separated in RATE_LIMIT_WHITELIST env var
+const WHITELIST = new Set(
+  (process.env.RATE_LIMIT_WHITELIST ?? "")
+    .split(",").map((s) => s.trim()).filter(Boolean)
+);
+
+// ─── Rate limiting (in-memory, per-Lambda) ────────────────────────────────────
+const rateMap = new Map<string, { count: number; reset: number }>();
+
+function checkRateLimit(ip: string): { limited: false } | { limited: true; resetAt: number } {
+  if (WHITELIST.has(ip)) return { limited: false };
+
   const now   = Date.now();
   const entry = rateMap.get(ip);
 
   if (!entry || now > entry.reset) {
     rateMap.set(ip, { count: 1, reset: now + WINDOW_MS });
-    return false;
+    return { limited: false };
   }
-  if (entry.count >= RATE_LIMIT) return true;
+  if (entry.count >= RATE_LIMIT) {
+    return { limited: true, resetAt: entry.reset };
+  }
   entry.count++;
-  return false;
+  return { limited: false };
 }
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -39,17 +53,21 @@ const schema = z.object({
   whySelected:         z.string().min(5, "Explique por que deveria ser selecionado.").max(2000),
   activeParticipation: z.boolean(),
   dreamConversation:   z.string().min(5, "Escreva com quem gostaria de conversar e por quê.").max(2000),
-  // Honeypot — must be empty/absent; bots fill it
   _hp:                 z.string().max(0).optional(),
 });
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  // IP rate limiting
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
-  if (isRateLimited(ip)) {
+  const ua = req.headers.get("user-agent") ?? "";
+
+  // Rate limit
+  const rl = checkRateLimit(ip);
+  if (rl.limited) {
+    addBlock({ ip, reason: "rate_limit", userAgent: ua, blockedAt: Date.now() });
+    const secsLeft = Math.ceil((rl.resetAt - Date.now()) / 1000);
     return NextResponse.json(
-      { error: "Muitas tentativas. Aguarde 15 minutos." },
+      { error: "rate_limit", secsLeft, resetAt: rl.resetAt },
       { status: 429 }
     );
   }
@@ -57,20 +75,21 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Honeypot check — bots fill hidden fields
+    // Honeypot — bots fill hidden fields
     if (body._hp && body._hp.length > 0) {
-      return NextResponse.json({ success: true }, { status: 201 }); // silent reject
+      addBlock({ ip, reason: "honeypot", userAgent: ua, blockedAt: Date.now() });
+      return NextResponse.json({ success: true }, { status: 201 }); // silent
     }
 
-    // Basic bot signals
-    const ua = req.headers.get("user-agent") ?? "";
+    // Bot UA detection
     const suspiciousUA = !ua || ua.length < 10 || /bot|crawl|spider|curl|wget|python|axios/i.test(ua);
     if (suspiciousUA) {
-      return NextResponse.json({ success: true }, { status: 201 }); // silent reject
+      addBlock({ ip, reason: "bot_ua", userAgent: ua || "(empty)", blockedAt: Date.now() });
+      return NextResponse.json({ success: true }, { status: 201 }); // silent
     }
 
     const data = schema.parse(body);
-    const { _hp, ...appData } = data; // strip honeypot
+    const { _hp, ...appData } = data;
 
     const application = await prisma.application.create({ data: appData });
 

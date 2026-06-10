@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, useInView } from "framer-motion";
 import { Container } from "@/components/ui/Container";
 
@@ -156,6 +156,20 @@ export function CTASection() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError]     = useState<string | null>(null);
+  const [retryAt, setRetryAt] = useState<number | null>(null);
+  const [secsLeft, setSecsLeft] = useState(0);
+
+  useEffect(() => {
+    if (!retryAt) return;
+    const tick = () => {
+      const s = Math.ceil((retryAt - Date.now()) / 1000);
+      if (s <= 0) { setRetryAt(null); setSecsLeft(0); setError(null); return; }
+      setSecsLeft(s);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [retryAt]);
 
   function set(key: keyof FormData) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -201,7 +215,9 @@ export function CTASection() {
       } else if (res.status === 409) {
         setError("Este e-mail já realizou uma aplicação.");
       } else if (res.status === 429) {
-        setError("Muitas tentativas. Aguarde 15 minutos e tente novamente.");
+        const j = await res.json().catch(() => ({}));
+        if (j.resetAt) setRetryAt(j.resetAt);
+        setError("rate_limit");
       } else {
         setError("Algo correu mal. Tente novamente.");
       }
@@ -456,15 +472,29 @@ export function CTASection() {
 
               {/* ── Error + Submit ── */}
               <div className="pt-10 space-y-4">
-                {error && (
+                {error === "rate_limit" ? (
+                  <div className="border border-red-500/15 bg-red-500/[0.04] px-5 py-4">
+                    <p className="font-mono text-[0.7rem] text-red-400/70 tracking-wide mb-1">
+                      Muitas tentativas.
+                    </p>
+                    {secsLeft > 0 && (
+                      <p className="font-mono text-[0.65rem] text-white/30 tracking-wide">
+                        {secsLeft >= 60
+                          ? `Aguarde ${Math.ceil(secsLeft / 60)} ${Math.ceil(secsLeft / 60) === 1 ? "minuto" : "minutos"} para tentar novamente.`
+                          : `Aguarde ${secsLeft} ${secsLeft === 1 ? "segundo" : "segundos"} para tentar novamente.`
+                        }
+                      </p>
+                    )}
+                  </div>
+                ) : error ? (
                   <p className="font-mono text-[0.7rem] text-red-400/70 tracking-wide">{error}</p>
-                )}
+                ) : null}
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || (error === "rate_limit" && secsLeft > 0)}
                   className="w-full btn-primary disabled:opacity-40 disabled:cursor-not-allowed transition-opacity py-5 text-[0.72rem] tracking-[0.25em]"
                 >
-                  {loading ? "· · ·" : "Candidatar"}
+                  {loading ? "· · ·" : error === "rate_limit" && secsLeft > 0 ? `Aguarde ${secsLeft}s` : "Candidatar"}
                 </button>
                 <p className="font-mono text-[0.6rem] text-white/20 uppercase tracking-widest text-center pt-2">
                   Cada aplicação é analisada individualmente · Sem spam
