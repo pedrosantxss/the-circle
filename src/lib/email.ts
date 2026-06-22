@@ -120,6 +120,60 @@ export async function sendAdminNotification(app: ApplicationData) {
   }
 }
 
+// ─── Approval email to candidate ─────────────────────────────────────────────
+export async function sendApprovalEmail(
+  app: { fullName: string; email: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const firstName = app.fullName.split(" ")[0];
+    await getResend().emails.send({
+      from:    "The Circle <noreply@thecirclerj.com>",
+      replyTo: "contato@thecirclerj.com",
+      to:      app.email,
+      subject: "Candidatura aprovada — The Circle",
+      html: `
+        <div style="font-family:ui-monospace,monospace;max-width:560px;margin:0 auto;background:#050505;color:#e8e8e4;padding:48px 40px;">
+          <p style="font-size:10px;letter-spacing:0.3em;text-transform:uppercase;color:#444;margin:0 0 40px;">
+            The Circle
+          </p>
+          <h1 style="font-size:26px;font-style:italic;color:#e8e8e4;margin:0 0 28px;line-height:1.15;font-weight:400;">
+            Candidatura aprovada.
+          </h1>
+          <p style="color:#888;line-height:1.85;font-size:14px;margin:0 0 12px;">
+            Olá, <strong style="color:#ccc;">${firstName}</strong>.
+          </p>
+          <p style="color:#888;line-height:1.85;font-size:14px;margin:0 0 24px;">
+            Sua candidatura para The Circle foi aprovada.
+          </p>
+          <p style="color:#888;line-height:1.85;font-size:14px;margin:0 0 24px;">
+            A partir de agora, você faz parte da próxima geração de jovens empreendedores
+            que querem crescer, construir e se conectar com pessoas ambiciosas.
+          </p>
+          <p style="color:#888;line-height:1.85;font-size:14px;margin:0 0 36px;">
+            Nos próximos passos, nossa equipe entrará em contato com você para explicar
+            o acesso à comunidade, eventos e próximos movimentos.
+          </p>
+          <p style="color:#ccc;font-size:16px;font-style:italic;margin:0 0 40px;">
+            Bem-vindo ao The Circle.
+          </p>
+          <div style="border-top:1px solid #111;padding-top:28px;">
+            <p style="font-size:12px;color:#555;font-style:italic;margin:0 0 10px;">
+              The Circle
+            </p>
+            <p style="font-size:9px;color:#2a2a2a;letter-spacing:0.2em;text-transform:uppercase;margin:0;">
+              A próxima geração de empreendedores começa aqui.
+            </p>
+          </div>
+        </div>
+      `,
+    });
+    return { success: true };
+  } catch (err) {
+    console.error("[email] Approval email failed:", err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function row(label: string, value: string) {
   return `

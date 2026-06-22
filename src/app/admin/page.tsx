@@ -26,6 +26,9 @@ interface Application {
   dreamConversation: string;
   adminNotes?: string | null;
   status: Status;
+  approvedEmailSentAt?: string | null;
+  approvedWhatsappSentAt?: string | null;
+  approvalNotificationError?: string | null;
   createdAt: string;
 }
 
@@ -119,8 +122,9 @@ export default function AdminPage() {
   const [filter, setFilter]     = useState<Status | "">("");
   const [loading, setLoading]   = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [updating, setUpdating] = useState<string | null>(null);
-  const searchTimeout           = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [updating,  setUpdating]  = useState<string | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
+  const searchTimeout             = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const [blocked, setBlocked]         = useState<BlockEntry[]>([]);
   const [blockedTotal, setBlockedTotal] = useState(0);
@@ -157,13 +161,32 @@ export default function AdminPage() {
 
   async function updateStatus(id: string, status: Status) {
     setUpdating(id);
-    await fetch(`/api/admin/applications/${id}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ status }),
-    });
-    setUpdating(null);
-    fetchApplications(search, filter);
+    try {
+      const res = await fetch(`/api/admin/applications/${id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, ...updated } : a)));
+      }
+    } finally {
+      setUpdating(null);
+    }
+  }
+
+  async function resendNotifications(id: string) {
+    setResending(id);
+    try {
+      const res = await fetch(`/api/admin/applications/${id}/notify`, { method: "POST" });
+      if (res.ok) {
+        const updated = await res.json();
+        setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, ...updated } : a)));
+      }
+    } finally {
+      setResending(null);
+    }
   }
 
   async function logout() {
@@ -341,6 +364,46 @@ export default function AdminPage() {
                           ))}
                         </div>
                       </div>
+
+                      {/* Approval notifications */}
+                      {app.status === "APPROVED" && (
+                        <div className="mb-6 pb-6 border-b border-white/[0.04]">
+                          <p className="text-[8px] uppercase tracking-[0.2em] text-[#333] mb-3">
+                            Notificações de aprovação
+                          </p>
+                          <div className="flex flex-wrap gap-8 items-start mb-3">
+                            <div>
+                              <p className="text-[7px] uppercase tracking-[0.15em] text-[#2a2a2a] mb-1.5">E-mail</p>
+                              <p className={`text-[11px] font-mono ${app.approvedEmailSentAt ? "text-emerald-400/60" : "text-red-400/40"}`}>
+                                {app.approvedEmailSentAt
+                                  ? `✓ ${new Date(app.approvedEmailSentAt).toLocaleString("pt-BR")}`
+                                  : "✗ Não enviado"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[7px] uppercase tracking-[0.15em] text-[#2a2a2a] mb-1.5">WhatsApp</p>
+                              <p className={`text-[11px] font-mono ${app.approvedWhatsappSentAt ? "text-emerald-400/60" : "text-[#2a2a2a]"}`}>
+                                {app.approvedWhatsappSentAt
+                                  ? `✓ ${new Date(app.approvedWhatsappSentAt).toLocaleString("pt-BR")}`
+                                  : "— não configurado"}
+                              </p>
+                            </div>
+                          </div>
+                          {app.approvalNotificationError && (
+                            <p className="text-[9px] font-mono text-red-400/50 mb-3 break-all">
+                              Erro: {app.approvalNotificationError}
+                            </p>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); resendNotifications(app.id); }}
+                            disabled={resending === app.id}
+                            style={MONO}
+                            className="px-3 py-1.5 text-[8px] uppercase tracking-wider border border-white/[0.07] text-[#444] hover:border-white/20 hover:text-[#aaa] transition-all cursor-pointer disabled:opacity-30"
+                          >
+                            {resending === app.id ? "Enviando..." : "Reenviar notificações"}
+                          </button>
+                        </div>
+                      )}
 
                       {/* Admin notes */}
                       <NotesEditor app={app} onSave={() => fetchApplications(search, filter)} />

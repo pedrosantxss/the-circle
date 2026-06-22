@@ -1,8 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { Status } from "@/generated/prisma/enums";
+import { sendApprovalEmail } from "@/lib/email";
+import { sendApprovalWhatsapp } from "@/lib/whatsapp";
 
 const VALID: Status[] = ["NEW", "UNDER_REVIEW", "APPROVED", "REJECTED"];
+
+type NotifUpdate = {
+  approvedEmailSentAt?: Date;
+  approvedWhatsappSentAt?: Date;
+  approvalNotificationError: string | null;
+};
+
+async function handleApprovalNotifications(app: {
+  id: string;
+  fullName: string;
+  email: string;
+  whatsapp: string;
+}) {
+  const [emailResult, waResult] = await Promise.all([
+    sendApprovalEmail(app),
+    sendApprovalWhatsapp(app),
+  ]);
+
+  const update: NotifUpdate = { approvalNotificationError: null };
+  if (emailResult.success) update.approvedEmailSentAt = new Date();
+  if (waResult.success)    update.approvedWhatsappSentAt = new Date();
+
+  const errors: string[] = [];
+  if (!emailResult.success) errors.push(`email: ${emailResult.error}`);
+  if (!waResult.success && !waResult.skipped) errors.push(`whatsapp: ${waResult.error}`);
+  if (errors.length > 0) update.approvalNotificationError = errors.join("; ");
+
+  try {
+    return await prisma.application.update({ where: { id: app.id }, data: update });
+  } catch (err) {
+    console.error("[approval] Failed to save notification state:", err);
+    return null;
+  }
+}
 
 export async function PATCH(
   req: NextRequest,
@@ -28,10 +64,23 @@ export async function PATCH(
       return NextResponse.json({ error: "Nenhum campo para atualizar" }, { status: 400 });
     }
 
-    const application = await prisma.application.update({
-      where: { id },
-      data,
-    });
+    // Read current status before potentially transitioning to APPROVED
+    let prevStatus: Status | null = null;
+    if (data.status === "APPROVED") {
+      const current = await prisma.application.findUnique({
+        where: { id },
+        select: { status: true },
+      });
+      prevStatus = (current?.status ?? null) as Status | null;
+    }
+
+    const application = await prisma.application.update({ where: { id }, data });
+
+    // Send notifications only on fresh APPROVED transition (not re-approve)
+    if (data.status === "APPROVED" && prevStatus !== "APPROVED") {
+      const notified = await handleApprovalNotifications(application);
+      return NextResponse.json(notified ?? application);
+    }
 
     return NextResponse.json(application);
   } catch {
