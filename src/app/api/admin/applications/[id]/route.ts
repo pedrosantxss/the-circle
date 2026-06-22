@@ -18,10 +18,14 @@ async function handleApprovalNotifications(app: {
   email: string;
   whatsapp: string;
 }) {
+  console.log("[approval] handleApprovalNotifications START id=%s email=%s", app.id, app.email);
+
   const [emailResult, waResult] = await Promise.all([
     sendApprovalEmail(app),
     sendApprovalWhatsapp(app),
   ]);
+
+  console.log("[approval] emailResult=%j waResult=%j", emailResult, waResult);
 
   const update: NotifUpdate = { approvalNotificationError: null };
   if (emailResult.success) update.approvedEmailSentAt = new Date();
@@ -32,8 +36,12 @@ async function handleApprovalNotifications(app: {
   if (!waResult.success && !waResult.skipped) errors.push(`whatsapp: ${waResult.error}`);
   if (errors.length > 0) update.approvalNotificationError = errors.join("; ");
 
+  console.log("[approval] DB update=%j", update);
+
   try {
-    return await prisma.application.update({ where: { id: app.id }, data: update });
+    const result = await prisma.application.update({ where: { id: app.id }, data: update });
+    console.log("[approval] DB save OK approvedEmailSentAt=%s", result.approvedEmailSentAt);
+    return result;
   } catch (err) {
     console.error("[approval] Failed to save notification state:", err);
     return null;
@@ -72,12 +80,14 @@ export async function PATCH(
         select: { status: true },
       });
       prevStatus = (current?.status ?? null) as Status | null;
+      console.log("[approval] PATCH id=%s prevStatus=%s newStatus=%s", id, prevStatus, data.status);
     }
 
     const application = await prisma.application.update({ where: { id }, data });
 
     // Send notifications only on fresh APPROVED transition (not re-approve)
     if (data.status === "APPROVED" && prevStatus !== "APPROVED") {
+      console.log("[approval] Triggering notifications for id=%s", id);
       const notified = await handleApprovalNotifications(application);
       return NextResponse.json(notified ?? application);
     }

@@ -124,14 +124,15 @@ export async function sendAdminNotification(app: ApplicationData) {
 export async function sendApprovalEmail(
   app: { fullName: string; email: string }
 ): Promise<{ success: boolean; error?: string }> {
+  console.log("[email] sendApprovalEmail START to=%s key_prefix=%s", app.email, (process.env.RESEND_API_KEY ?? "missing").substring(0, 8));
   try {
     const firstName = app.fullName.split(" ")[0];
-    await getResend().emails.send({
+    const resendResponse = await getResend().emails.send({
       from:    "The Circle <noreply@thecirclerj.com>",
       replyTo: "contato@thecirclerj.com",
       to:      app.email,
       subject: "Candidatura aprovada — The Circle",
-      html: `
+      html: /* html */`
         <div style="font-family:ui-monospace,monospace;max-width:560px;margin:0 auto;background:#050505;color:#e8e8e4;padding:48px 40px;">
           <p style="font-size:10px;letter-spacing:0.3em;text-transform:uppercase;color:#444;margin:0 0 40px;">
             The Circle
@@ -167,9 +168,14 @@ export async function sendApprovalEmail(
         </div>
       `,
     });
+    console.log("[email] Resend response: %j", resendResponse);
+    if (resendResponse.error) {
+      console.error("[email] Resend rejected:", resendResponse.error);
+      return { success: false, error: JSON.stringify(resendResponse.error) };
+    }
     return { success: true };
   } catch (err) {
-    console.error("[email] Approval email failed:", err);
+    console.error("[email] Approval email exception:", err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
