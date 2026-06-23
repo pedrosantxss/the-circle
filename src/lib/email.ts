@@ -25,9 +25,11 @@ interface ApplicationData {
 }
 
 // ─── Confirmation to applicant ────────────────────────────────────────────────
-export async function sendConfirmationEmail(app: ApplicationData) {
+export async function sendConfirmationEmail(
+  app: ApplicationData
+): Promise<{ success: boolean; error?: string }> {
   try {
-    await getResend().emails.send({
+    const r = await getResend().emails.send({
       from:    "The Circle <noreply@thecirclerj.com>",
       to:      app.email,
       subject: "Aplicação recebida — The Circle",
@@ -65,15 +67,23 @@ export async function sendConfirmationEmail(app: ApplicationData) {
         </div>
       `,
     });
+    if (r.error) {
+      console.error("[email] Confirmation rejected:", r.error);
+      return { success: false, error: JSON.stringify(r.error) };
+    }
+    return { success: true };
   } catch (err) {
-    console.error("[email] Confirmação falhou:", err);
+    console.error("[email] Confirmation exception:", err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
 // ─── Notification to admin ────────────────────────────────────────────────────
-export async function sendAdminNotification(app: ApplicationData) {
+export async function sendAdminNotification(
+  app: ApplicationData
+): Promise<{ success: boolean; error?: string }> {
   try {
-    await getResend().emails.send({
+    const r = await getResend().emails.send({
       from:    "The Circle <noreply@thecirclerj.com>",
       to:      "contato@thecirclerj.com",
       subject: `Nova aplicação: ${app.fullName} · ${app.city}`,
@@ -115,8 +125,14 @@ export async function sendAdminNotification(app: ApplicationData) {
         </div>
       `,
     });
+    if (r.error) {
+      console.error("[email] Admin notification rejected:", r.error);
+      return { success: false, error: JSON.stringify(r.error) };
+    }
+    return { success: true };
   } catch (err) {
-    console.error("[email] Notificação admin falhou:", err);
+    console.error("[email] Admin notification exception:", err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 

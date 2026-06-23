@@ -93,8 +93,19 @@ export async function POST(req: NextRequest) {
 
     const application = await prisma.application.create({ data: appData });
 
-    void sendConfirmationEmail(application);
-    void sendAdminNotification(application);
+    void Promise.allSettled([
+      sendConfirmationEmail(application),
+      sendAdminNotification(application),
+    ]).then(([confirmResult, adminResult]) => {
+      if (confirmResult.status === "fulfilled" && !confirmResult.value.success)
+        console.error("[api] Confirmation email failed:", confirmResult.value.error);
+      if (adminResult.status === "fulfilled" && !adminResult.value.success)
+        console.error("[api] Admin notification failed:", adminResult.value.error);
+      if (confirmResult.status === "rejected")
+        console.error("[api] Confirmation email threw:", confirmResult.reason);
+      if (adminResult.status === "rejected")
+        console.error("[api] Admin notification threw:", adminResult.reason);
+    });
 
     return NextResponse.json({ success: true, id: application.id }, { status: 201 });
   } catch (err) {
