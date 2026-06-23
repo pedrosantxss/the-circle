@@ -124,7 +124,6 @@ export async function sendAdminNotification(app: ApplicationData) {
 export async function sendApprovalEmail(
   app: { fullName: string; email: string }
 ): Promise<{ success: boolean; error?: string }> {
-  console.log("[email] sendApprovalEmail START to=%s key_prefix=%s", app.email, (process.env.RESEND_API_KEY ?? "missing").substring(0, 8));
   try {
     const firstName = app.fullName.split(" ")[0];
     const resendResponse = await getResend().emails.send({
@@ -168,7 +167,6 @@ export async function sendApprovalEmail(
         </div>
       `,
     });
-    console.log("[email] Resend response: %j", resendResponse);
     if (resendResponse.error) {
       console.error("[email] Resend rejected:", resendResponse.error);
       return { success: false, error: JSON.stringify(resendResponse.error) };
